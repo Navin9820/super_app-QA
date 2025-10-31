@@ -1,0 +1,7 @@
+node_modules/
+.env
+check-product-images.js
+check-quick-links.js
+cleanup-fake-images.js
+migrate-product-images.js
+fix-product-urls.js

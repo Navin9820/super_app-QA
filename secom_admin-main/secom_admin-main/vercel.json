@@ -1,0 +1,41 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "build"
+      }
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/static/(.*)",
+      "destination": "/static/$1"
+    },
+    {
+      "source": "/favicon.ico",
+      "destination": "/favicon.ico"
+    },
+    {
+      "source": "/manifest.json",
+      "destination": "/manifest.json"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "env": {
+    "REACT_APP_API_URL": "https://super-app-0ofo.onrender.com"
+  },
+  "build": {
+    "env": {
+      "REACT_APP_API_URL": "https://super-app-0ofo.onrender.com",
+      "DISABLE_ESLINT_PLUGIN": "true",
+      "CI": "false",
+      "SKIP_PREFLIGHT_CHECK": "true"
+    }
+  }
+} 

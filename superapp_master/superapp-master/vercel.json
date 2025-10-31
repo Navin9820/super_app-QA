@@ -1,0 +1,84 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "build"
+      }
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=(self), payment=(), usb=()"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=31536000; includeSubDomains"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https: https://api.razorpay.com https://checkout.razorpay.com https://js.razorpay.com; style-src 'self' 'unsafe-inline' https: data:; img-src 'self' data: https: https://*.tile.openstreetmap.org https://cdn-icons-png.flaticon.com https://unpkg.com https://*.razorpay.com; font-src 'self' https: data:; connect-src 'self' https: https://nominatim.openstreetmap.org https://api.locationiq.com https://api.razorpay.com https://*.razorpay.com; frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com https://*.razorpay.com; media-src 'self' https: data:;"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/static/(.*)",
+      "destination": "/static/$1"
+    },
+    {
+      "source": "/favicon.ico",
+      "destination": "/favicon.ico"
+    },
+    {
+      "source": "/manifest.json",
+      "destination": "/manifest.json"
+    },
+    {
+      "source": "/placeholder-image.png",
+      "destination": "/placeholder-image.png"
+    },
+    {
+      "source": "/fallback.jpg",
+      "destination": "/fallback.jpg"
+    },
+    {
+      "source": "/fallback-hotel.jpg",
+      "destination": "/fallback-hotel.jpg"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "env": {
+    "REACT_APP_API_URL": "https://super-app-0ofo.onrender.com",
+    "DISABLE_ESLINT_PLUGIN": "true",
+    "GENERATE_SOURCEMAP": "false",
+    "CI": "false",
+    "SKIP_PREFLIGHT_CHECK": "true"
+  }
+}
