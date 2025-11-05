@@ -11,15 +11,42 @@ function Cart() {
   // ✅ REPLACE: Remove local cart state, use global CartContext
   const { cart, loading, removeFromCart, updateCartItem } = useCart();
   const [error, setError] = useState(null);
+  const [allAddresses, setAllAddresses] = useState([]);
+ const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [deliveryAddress, setDeliveryAddress] = useState(null);
   const navigate = useNavigate();
 
   // Load saved delivery address
   useEffect(() => {
-    const savedAddress = localStorage.getItem('delivery_address');
-    if (savedAddress) {
-      setDeliveryAddress(JSON.parse(savedAddress));
-    }
+    const savedAddresses = localStorage.getItem('delivery_addresses');
+    const addresses = savedAddresses ? JSON.parse(savedAddresses) : [];
+  
+    // Load selected address ID
+    const savedSelectedId = localStorage.getItem('selected_delivery_address_id');
+  
+    setAllAddresses(addresses);
+  
+    if (addresses.length > 0) {
+      let selectedAddr = null;
+  
+      // If a selected ID exists and matches an address, use it
+      if (savedSelectedId) {
+        selectedAddr = addresses.find(addr => addr.id === savedSelectedId);
+      }
+  
+      // Fallback: use first address if none selected
+      if (!selectedAddr && addresses.length > 0) {
+        selectedAddr = addresses[0];
+        // Optionally auto-save this as selected
+        localStorage.setItem('selected_delivery_address_id', selectedAddr.id);
+      }
+  
+      setDeliveryAddress(selectedAddr);
+      setSelectedAddressId(selectedAddr?.id || null);
+    } else {
+      setDeliveryAddress(null);
+      setSelectedAddressId(null);
+    }  
   }, []);
 
   // ✅ TRANSFORM: Convert cart data to display format
@@ -202,28 +229,63 @@ function Cart() {
             ))}
 
             {/* Delivery Address Section */}
-            {deliveryAddress && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="text-gray-800 mb-2">Delivery Address</h3>
-                    <p className="text-xs text-gray-700">
-                      <strong>{deliveryAddress.fullName}</strong><br/>
-                      {deliveryAddress.address_line1}<br/>
-                      {deliveryAddress.landmark && `Near ${deliveryAddress.landmark}`}<br/>
-                      {deliveryAddress.city}, {deliveryAddress.state} - {deliveryAddress.pincode}<br/>
-                      📞 {deliveryAddress.phone}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => navigate('/home-clothes/address')}
-                    className="text-blue-600 text-xs underline"
-                  >
-                    Edit
-                  </button>
-                </div>
+            {allAddresses.length > 0 && (
+  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
+    <h3 className="text-gray-800 mb-3 font-medium">Delivery Address</h3>
+
+    {allAddresses.length > 1 ? (
+      <div className="space-y-3">
+        {allAddresses.map((addr) => (
+          <div
+            key={addr.id}
+            className={`border rounded-lg p-3 cursor-pointer ${
+              selectedAddressId === addr.id ? 'border-blue-500 bg-blue-100' : 'border-gray-200'
+            }`}
+            onClick={() => {
+              setSelectedAddressId(addr.id);
+              setDeliveryAddress(addr);
+              localStorage.setItem('selected_delivery_address_id', addr.id);
+            }}
+          >
+            <div className="flex items-start">
+              <input
+                type="radio"
+                checked={selectedAddressId === addr.id}
+                readOnly
+                className="mt-1 mr-3"
+              />
+              <div className="text-xs text-gray-700">
+                <strong>{addr.fullName}</strong><br />
+                {addr.address_line1}
+                {addr.landmark && <>, Near {addr.landmark}</>}
+                <br />
+                {addr.city}, {addr.state} - {addr.pincode}<br />
+                📞 {addr.phone}
               </div>
-            )}
+            </div>
+          </div>
+        ))}
+      </div>
+    ) : (
+      // Only one address: just display it
+      <div className="text-xs text-gray-700">
+        <strong>{deliveryAddress.fullName}</strong><br />
+        {deliveryAddress.address_line1}
+        {deliveryAddress.landmark && <>, Near {deliveryAddress.landmark}</>}
+        <br />
+        {deliveryAddress.city}, {deliveryAddress.state} - {deliveryAddress.pincode}<br />
+        📞 {deliveryAddress.phone}
+      </div>
+    )}
+
+    <button
+      onClick={() => navigate('/home-clothes/address')}
+      className="text-blue-600 text-xs underline mt-3 block"
+    >
+      + Add or Manage Addresses
+    </button>
+  </div>
+)}
 
             {/* Cart Summary */}
             <div className="bg-gray-50 rounded-lg p-4 mt-6">

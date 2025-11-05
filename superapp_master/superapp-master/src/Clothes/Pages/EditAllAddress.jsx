@@ -105,20 +105,15 @@ function EditAllAddress() {
                         <span className="text-sm text-gray-500">({addresses.length} saved)</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <img 
-                            src={plus} 
-                            alt="plus" 
-                            className="cursor-pointer w-8 h-8" 
-                            onClick={() => {
-                                if (addresses.length > 0) {
-                                    // Edit the first address
-                                    navigate(`/home-clothes/edit-address-values?index=0`);
-                                } else {
-                                    // If no addresses, go to profile to create first one
-                                    navigate('/home-clothes/profile');
-                                }
-                            }} 
-                        />
+                    <img 
+  src={plus} 
+  alt="plus" 
+  className="cursor-pointer w-8 h-8" 
+  onClick={() => {
+    // Always go to NEW address form (not edit)
+    navigate('/home-clothes/address');
+  }} 
+/>
                     </div>
                 </div>
 
