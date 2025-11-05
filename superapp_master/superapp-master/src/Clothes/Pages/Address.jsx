@@ -1,14 +1,22 @@
-import React from 'react';
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate, useLocation } from 'react-router-dom';
 import ClothesHeader from "../Header/ClothesHeader";
 import step1 from "../Images/step1.svg";
 import gps from "../Images/gps.svg";
-import { useNavigate } from 'react-router-dom';
 import AddressPicker from '../../Components/maps/AddressPicker';
 import { profileService } from '../../services/profileService';
 
 function Address() {
+    const navigate = useNavigate();
+    const location = useLocation();
+    const urlParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+    const editId = urlParams.get('edit');
+
+    const [isEditing, setIsEditing] = useState(false);
+    const [addressesList, setAddressesList] = useState([]);
+
     const [selected, setSelected] = useState("Home");
+    const [customAddressType, setCustomAddressType] = useState('');
     const [selectedLocation, setSelectedLocation] = useState(null);
     const [showMapPicker, setShowMapPicker] = useState(false);
     const [formData, setFormData] = useState({
@@ -23,7 +31,6 @@ function Address() {
         pincode: ''
     });
 
-    // List of all Indian states and union territories
     const indianStates = [
         'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
         'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
@@ -35,18 +42,15 @@ function Address() {
     ];
 
     const [errors, setErrors] = useState({});
-
     const buttons = ["Home", "Office", "Others"];
-    const navigate = useNavigate();
 
-    // Function to sync address to all modules
+    // Sync address to profile (optional)
     const syncAddressToAllModules = (addressData) => {
         try {
-            // Create unified address format for profileService
             const unifiedAddress = {
                 fullName: addressData.fullName,
                 phone: addressData.phone,
-                addressLine1: addressData.houseNo, // Complete address
+                addressLine1: addressData.houseNo,
                 addressLine2: addressData.roadName,
                 city: addressData.city,
                 state: addressData.state,
@@ -54,115 +58,80 @@ function Address() {
                 country: 'India'
             };
 
-            // Get current profile and update with new address
             const currentProfile = profileService.getProfile();
-            const updatedProfile = {
-                ...currentProfile,
-                ...unifiedAddress
-            };
-
-            // Save updated profile
+            const updatedProfile = { ...currentProfile, ...unifiedAddress };
             profileService.saveProfile(updatedProfile);
-
             console.log('✅ Address synced to all modules from Clothes');
         } catch (error) {
-            console.error('❌ Failed to sync address to all modules:', error);
+            console.error('❌ Failed to sync address:', error);
         }
     };
 
-    // Auto-fill form with saved address data
+    // Load user profile for name/phone
     useEffect(() => {
-        const loadSavedAddress = () => {
-            try {
-                // Check for saved delivery address
-                const savedAddress = localStorage.getItem('delivery_address');
-                if (savedAddress) {
-                    const addressData = JSON.parse(savedAddress);
-                    console.log('📍 Loading saved address:', addressData);
-                    
-                    // Auto-fill form with saved data
-                    setFormData({
-                        fullName: addressData.fullName || '',
-                        phone: addressData.phone || '',
-                        altPhone: addressData.altPhone || '',
-                        houseNo: addressData.address_line1 || '',
-                        roadName: addressData.roadName || '',
-                        landmark: addressData.landmark || '',
-                        city: addressData.city || '',
-                        state: addressData.state || '',
-                        pincode: addressData.pincode || ''
-                    });
-                    
-                    // Set address type if available
-                    if (addressData.type && buttons.includes(addressData.type)) {
-                        setSelected(addressData.type);
-                    }
-                    
-                    // Set location if available
-                    if (addressData.location) {
-                        setSelectedLocation(addressData.location);
-                    }
-                }
-                
-                // Also check for user profile data
-                const userProfile = localStorage.getItem('userProfile');
-                if (userProfile) {
-                    const profile = JSON.parse(userProfile);
-                    console.log('👤 Loading user profile:', profile);
-                    
-                    // Auto-fill name and phone if not already filled
-                    setFormData(prev => ({
-                        ...prev,
-                        fullName: prev.fullName || profile.name || '',
-                        phone: prev.phone || profile.phone || ''
-                    }));
-                }
-            } catch (error) {
-                console.error('❌ Error loading saved address:', error);
+        try {
+            const userProfile = localStorage.getItem('userProfile');
+            if (userProfile) {
+                const profile = JSON.parse(userProfile);
+                setFormData(prev => ({
+                    ...prev,
+                    fullName: prev.fullName || profile.name || '',
+                    phone: prev.phone || profile.phone || ''
+                }));
             }
-        };
-        
-        loadSavedAddress();
+        } catch (error) {
+            console.error('Error loading user profile:', error);
+        }
     }, []);
 
-    // Handle form data changes
+    // Load all addresses & handle edit mode
+    useEffect(() => {
+        const savedAddresses = JSON.parse(localStorage.getItem('delivery_addresses') || '[]');
+        setAddressesList(savedAddresses);
+
+        if (editId) {
+            const addressToEdit = savedAddresses.find(addr => String(addr.id) === String(editId));
+            if (addressToEdit) {
+                setIsEditing(true);
+                setFormData({
+                    fullName: addressToEdit.fullName || '',
+                    phone: addressToEdit.phone || '',
+                    altPhone: addressToEdit.altPhone || '',
+                    houseNo: addressToEdit.houseNo || '',
+                    roadName: addressToEdit.roadName || '',
+                    landmark: addressToEdit.landmark || '',
+                    city: addressToEdit.city || '',
+                    state: addressToEdit.state || '',
+                    pincode: addressToEdit.pincode || ''
+                });
+                setSelected(addressToEdit.type || 'Home');
+                if (addressToEdit.type === 'Others') {
+                    setCustomAddressType(addressToEdit.customLabel || '');
+                }
+                setSelectedLocation(addressToEdit.location || null);
+            }
+        }
+    }, [editId]);
+
     const handleInputChange = (field, value) => {
         let processedValue = value;
-        
-        // Phone number formatting - only allow digits
         if (field === 'phone' || field === 'altPhone') {
             processedValue = value.replace(/\D/g, '').slice(0, 10);
         }
-        
-        // Pincode formatting - only allow digits, max 6 digits, first digit cannot be 0
         if (field === 'pincode') {
             processedValue = value.replace(/\D/g, '').slice(0, 6);
         }
-        
-        // Name fields - only allow letters and spaces
-        if (field === 'fullName' || field === 'city' || field === 'state') {
+        if (['fullName', 'city', 'state'].includes(field)) {
             processedValue = value.replace(/[^a-zA-Z\s]/g, '');
         }
-        
-        setFormData(prev => ({
-            ...prev,
-            [field]: processedValue
-        }));
-        
-        // Clear error when user types
+        setFormData(prev => ({ ...prev, [field]: processedValue }));
         if (errors[field]) {
-            setErrors(prev => ({
-                ...prev,
-                [field]: ''
-            }));
+            setErrors(prev => ({ ...prev, [field]: '' }));
         }
     };
 
-    // Comprehensive validation function
     const validateForm = () => {
         const newErrors = {};
-        
-        // Full Name validation
         if (!formData.fullName.trim()) {
             newErrors.fullName = 'Name is required';
         } else if (formData.fullName.trim().length < 2) {
@@ -170,39 +139,29 @@ function Address() {
         } else if (!/^[a-zA-Z\s]+$/.test(formData.fullName.trim())) {
             newErrors.fullName = 'Name can only contain letters and spaces';
         }
-        
-        // Phone validation
+
         if (!formData.phone.trim()) {
             newErrors.phone = 'Phone is required';
         } else if (!/^\d{10}$/.test(formData.phone.trim())) {
             newErrors.phone = 'Please enter a valid 10-digit phone number';
         }
-        
-        // Alternative phone validation (if provided)
+
         if (formData.altPhone.trim() && !/^\d{10}$/.test(formData.altPhone.trim())) {
             newErrors.altPhone = 'Please enter a valid 10-digit phone number';
         }
-        
-        // Complete Address validation
+
         if (!formData.houseNo.trim()) {
             newErrors.houseNo = 'Complete address is required';
         } else if (formData.houseNo.trim().length < 10) {
             newErrors.houseNo = 'Please enter a complete address (at least 10 characters)';
         }
-        
-        // Road Name validation
+
         if (!formData.roadName.trim()) {
             newErrors.roadName = 'Road name is required';
         } else if (formData.roadName.trim().length < 3) {
             newErrors.roadName = 'Road name must be at least 3 characters';
         }
-        
-        // Landmark validation (optional)
-        if (formData.landmark.trim() && formData.landmark.trim().length < 3) {
-            newErrors.landmark = 'Landmark must be at least 3 characters if provided';
-        }
-        
-        // City validation
+
         if (!formData.city.trim()) {
             newErrors.city = 'City is required';
         } else if (formData.city.trim().length < 2) {
@@ -210,8 +169,7 @@ function Address() {
         } else if (!/^[a-zA-Z\s]+$/.test(formData.city.trim())) {
             newErrors.city = 'City can only contain letters and spaces';
         }
-        
-        // State validation
+
         if (!formData.state.trim()) {
             newErrors.state = 'State is required';
         } else if (formData.state.trim().length < 2) {
@@ -219,65 +177,45 @@ function Address() {
         } else if (!/^[a-zA-Z\s]+$/.test(formData.state.trim())) {
             newErrors.state = 'State can only contain letters and spaces';
         }
-        
-        // Pincode validation
+
         if (!formData.pincode.trim()) {
             newErrors.pincode = 'Pincode is required';
         } else if (!/^[1-9][0-9]{5}$/.test(formData.pincode.trim())) {
             newErrors.pincode = 'Please enter a valid 6-digit pincode';
         }
-        
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
 
-    // Handle location selection from map
     const handleLocationSelect = (location) => {
-        // Check if location is valid
-        if (!location) {
-            console.warn('Location is null or undefined');
-            return;
-        }
-        
+        if (!location) return;
         setSelectedLocation(location);
-        
-        // Auto-fill the full address in the houseNo field
         const fullAddress = location.address || location.name || '';
-        
-        // Also auto-fill individual address components if available
-        let roadName = '';
-        let landmark = '';
-        let city = '';
-        let state = '';
-        let pincode = '';
-        
-        if (location.components && location.components.length > 0) {
-            const components = location.components;
-            
-            // Extract address components
-            const route = components.find(c => c.types && c.types.includes('route'))?.long_name || '';
-            const sublocality = components.find(c => c.types && c.types.includes('sublocality'))?.long_name || '';
-            const locality = components.find(c => c.types && c.types.includes('locality'))?.long_name || '';
-            const administrativeArea = components.find(c => c.types && c.types.includes('administrative_area_level_1'))?.long_name || '';
-            const postalCode = components.find(c => c.types && c.types.includes('postal_code'))?.long_name || '';
-            
+        let roadName = '', landmark = '', city = '', state = '', pincode = '';
+
+        if (location.components?.length > 0) {
+            const comps = location.components;
+            const route = comps.find(c => c.types?.includes('route'))?.long_name || '';
+            const sublocality = comps.find(c => c.types?.includes('sublocality'))?.long_name || '';
+            const locality = comps.find(c => c.types?.includes('locality'))?.long_name || '';
+            const adminArea = comps.find(c => c.types?.includes('administrative_area_level_1'))?.long_name || '';
+            const postal = comps.find(c => c.types?.includes('postal_code'))?.long_name || '';
+
             roadName = route || sublocality || locality || '';
             landmark = sublocality || locality || '';
-            city = locality || administrativeArea || '';
-            state = administrativeArea || '';
-            pincode = postalCode || '';
+            city = locality || adminArea || '';
+            state = adminArea || '';
+            pincode = postal || '';
         } else if (location.address) {
-            // Fallback: Parse the full address string if components are not available
-            const addressParts = location.address.split(', ');
-            
-            // Try to intelligently parse the address
-            roadName = addressParts[1] || addressParts[0] || '';
-            landmark = addressParts[2] || addressParts[1] || '';
-            city = addressParts[addressParts.length - 3] || addressParts[addressParts.length - 2] || '';
-            state = addressParts[addressParts.length - 2] || '';
-            pincode = addressParts[addressParts.length - 1]?.match(/\d{6}/)?.[0] || '';
+            const parts = location.address.split(', ');
+            roadName = parts[1] || parts[0] || '';
+            landmark = parts[2] || parts[1] || '';
+            city = parts[parts.length - 3] || parts[parts.length - 2] || '';
+            state = parts[parts.length - 2] || '';
+            pincode = parts[parts.length - 1]?.match(/\d{6}/)?.[0] || '';
         }
-        
+
         setFormData(prev => ({
             ...prev,
             houseNo: fullAddress,
@@ -289,57 +227,117 @@ function Address() {
         }));
     };
 
-    // Handle form submission
     const handleSubmit = (e) => {
         e.preventDefault();
-        
-        // Validate form
-        if (!validateForm()) {
-            return;
-        }
-        
-        // Create complete address object
-        const addressData = {
+        if (!validateForm()) return;
+
+        const addressTypeLabel = selected === "Others"
+            ? (customAddressType.trim() || "Others")
+            : selected;
+
+        const newAddress = {
+            id: isEditing ? editId : Date.now(),
             type: selected,
             fullName: formData.fullName,
             phone: formData.phone,
             altPhone: formData.altPhone,
-            address_line1: formData.houseNo, // This now contains the complete address
+            houseNo: formData.houseNo,
+            roadName: formData.roadName,
             landmark: formData.landmark,
             city: formData.city,
             state: formData.state,
             pincode: formData.pincode,
             country: 'India',
-            location: selectedLocation
+            location: selectedLocation,
+            addressType: addressTypeLabel,
+            customLabel: selected === "Others" ? customAddressType.trim() : undefined
         };
 
-        console.log('✅ Saving address data:', addressData);
-        
-        // Save address to localStorage for payment process
-        localStorage.setItem('delivery_address', JSON.stringify(addressData));
-        
-        // Sync address to all modules (hotel, food, grocery, taxi, etc.)
-        syncAddressToAllModules(addressData);
-        
-        // Trigger custom event to notify profile components to refresh
-        window.dispatchEvent(new CustomEvent('addressUpdated', { 
-            detail: { addressData } 
-        }));
-        
-        // Navigate to payment page
-        navigate('/home-clothes/payment');
+        try {
+            const existing = JSON.parse(localStorage.getItem('delivery_addresses') || '[]');
+            let updated;
+
+            if (isEditing) {
+                updated = existing.map(addr =>
+                    String(addr.id) === String(editId) ? newAddress : addr
+                );
+            } else {
+                updated = [...existing, newAddress];
+                // Auto-select first address as default
+                if (existing.length === 0) {
+                    localStorage.setItem('selected_delivery_address_id', String(newAddress.id));
+                }
+            }
+
+            localStorage.setItem('delivery_addresses', JSON.stringify(updated));
+            syncAddressToAllModules(newAddress);
+            window.dispatchEvent(new CustomEvent('addressUpdated'));
+
+            navigate('/home-clothes/cart'); // Go back to cart to see changes
+        } catch (error) {
+            console.error('❌ Failed to save address:', error);
+        }
     };
 
     return (
         <div className='bg-[#F8F8F8] min-h-screen'>
-            <ClothesHeader />
+            {/* <ClothesHeader /> */}
             <div className='border border-[#E1E1E1] py-4'>
                 <img src={step1} alt="" className="w-full mt-20 px-6" />
             </div>
-            
+
+            {/* 👇 SAVED ADDRESSES LIST */}
+            {addressesList.length > 0 && (
+                <div className="px-4 pb-4">
+                    <div className="mb-6 bg-white rounded-lg p-4 shadow-sm border">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                            Saved Addresses ({addressesList.length})
+                        </h3>
+                        <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+                            {addressesList.map((addr) => (
+                                <div key={addr.id} className="border rounded p-3 bg-gray-50">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <div className="font-medium">{addr.fullName}</div>
+                                            <div className="text-sm text-gray-600">
+                                                {addr.houseNo}, {addr.roadName}<br />
+                                                {addr.city}, {addr.state} - {addr.pincode}
+                                            </div>
+                                            <div className="text-xs text-gray-500 mt-1">
+                                                Type: {addr.addressType || addr.type}
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => navigate(`/home-clothes/address?edit=${addr.id}`)}
+                                                className="text-blue-600 text-xs underline"
+                                            >
+                                                Edit
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    localStorage.setItem('selected_delivery_address_id', String(addr.id));
+                                                    window.dispatchEvent(new CustomEvent('addressUpdated'));
+                                                    alert('Default address updated!');
+                                                }}
+                                                className="text-green-600 text-xs underline"
+                                            >
+                                                Set Default
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="flex justify-between items-center px-4 pt-2">
                 <div className="flex items-center gap-3">
-                    <h2 className="text-base font-medium">Add delivery address</h2>
+                    <h2 className="text-base font-medium">
+                        {isEditing ? 'Edit delivery address' : 'Add delivery address'}
+                    </h2>
                 </div>
                 <div className="flex items-center gap-2">
                     <span className='text-[#888888] text-xs font-normal'>Add Location</span>
@@ -353,7 +351,6 @@ function Address() {
             </div>
 
             <div className='px-4 pb-16'>
-                {/* Map-based Address Picker */}
                 {showMapPicker && (
                     <div className="mb-6 bg-white rounded-lg p-4 shadow-sm">
                         <h3 className="text-lg font-semibold mb-3 text-gray-800">
@@ -370,7 +367,6 @@ function Address() {
                     </div>
                 )}
 
-                {/* Selected Location Display */}
                 {selectedLocation && (
                     <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                         <div className="flex items-center gap-2 mb-2">
@@ -383,6 +379,7 @@ function Address() {
                 )}
 
                 <form onSubmit={handleSubmit} className='space-y-4'>
+                    {/* ... (all your existing form fields remain unchanged) */}
                     <div>
                         <label className="block text-sm text-gray-600 w-full">Full name</label>
                         <input
@@ -534,7 +531,7 @@ function Address() {
                                             : 'bg-white border-gray-300'
                                 }`}
                                 style={{
-                                    fontSize: '16px', // Prevents zoom on iOS
+                                    fontSize: '16px',
                                     WebkitAppearance: 'none',
                                     MozAppearance: 'none',
                                     appearance: 'none',
@@ -543,8 +540,8 @@ function Address() {
                                     backgroundPosition: 'right 12px center',
                                     backgroundSize: '16px',
                                     paddingRight: '40px',
-                                    maxHeight: '200px', // Limit dropdown height
-                                    overflowY: 'auto' // Enable scrolling within dropdown
+                                    maxHeight: '200px',
+                                    overflowY: 'auto'
                                 }}
                                 required
                             >
@@ -589,7 +586,12 @@ function Address() {
                             <button
                                 key={btn}
                                 type="button"
-                                onClick={() => setSelected(btn)}
+                                onClick={() => {
+                                    setSelected(btn);
+                                    if (btn !== "Others") {
+                                        setCustomAddressType('');
+                                    }
+                                }}
                                 className={`px-4 py-1 rounded-full border ${selected === btn
                                     ? "bg-[#5C3FFF] text-white"
                                     : "bg-white text-black border-gray-300"
@@ -600,13 +602,33 @@ function Address() {
                         ))}
                     </div>
 
-                                         {/* Submit Button */}
-                     <button
-                         type="submit"
-                         className="w-full bg-[#5C3FFF] text-white py-3 rounded-full font-medium mt-6 hover:bg-[#4A2FCC]"
-                     >
-                         Continue to Payment
-                     </button>
+                    {selected === "Others" && (
+                        <div className="mt-3">
+                            <label className="block text-sm text-gray-600 w-full">
+                                Specify address type (e.g., Gym, Friend's House)
+                            </label>
+                            <input
+                                type="text"
+                                value={customAddressType}
+                                onChange={(e) => setCustomAddressType(e.target.value.trimStart())}
+                                placeholder="Enter custom label"
+                                maxLength="20"
+                                className="w-full p-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-[#5C3FFF] mt-1 bg-white"
+                            />
+                            {customAddressType && !/^[a-zA-Z\s]{2,20}$/.test(customAddressType) && (
+                                <p className="text-red-500 text-xs mt-1 ml-2">
+                                    ⚠️ Must be 2–20 letters and spaces only
+                                </p>
+                            )}
+                        </div>
+                    )}
+
+                    <button
+                        type="submit"
+                        className="w-full bg-[#5C3FFF] text-white py-3 rounded-full font-medium mt-6 hover:bg-[#4A2FCC]"
+                    >
+                        {isEditing ? 'Update Address' : 'Add Address'}
+                    </button>
                 </form>
             </div>
         </div>

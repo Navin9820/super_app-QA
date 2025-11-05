@@ -19,5 +19,7 @@ module.exports = {
     es6: true,
     node: true
   },
-  root: true
+  root: true,
+  "cache": true,
+  "cacheLocation": "/Users/jamesnavin/.eslintcache"
 }; 

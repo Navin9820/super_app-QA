@@ -210,18 +210,16 @@ function Myorders() {
         fetchOrders();
     }, [navigate]);
 
-    // Poll for order updates every 5 seconds for automatic status updates (optimized)
+    // Poll for order updates every 30 seconds
     useEffect(() => {
         const pollOrders = async () => {
             try {
                 const token = localStorage.getItem('token') || localStorage.getItem('demoToken') || 'demo-token';
                 
-                // Get user ID for consistent order fetching
                 const userData = JSON.parse(localStorage.getItem('userData') || '{}');
                 const userEmail = userData.email || localStorage.getItem('userEmail');
                 const userPhone = userData.phone || localStorage.getItem('userPhone');
                 
-                // Generate a consistent user ID based on email/phone for demo purposes
                 const userId = userEmail ? `user_${userEmail.replace('@', '_').replace('.', '_')}` : 
                               userPhone ? `user_${userPhone}` : 
                               'default_user';
@@ -230,7 +228,7 @@ function Myorders() {
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json',
-                        'x-user-id': userId || '' // Send user ID for proper order filtering
+                        'x-user-id': userId || ''
                     }
                 });
                 
@@ -238,7 +236,6 @@ function Myorders() {
                     const data = await response.json();
                     const ordersArray = Array.isArray(data.data) ? data.data : [];
                     
-                    // Transform backend data to match frontend expectations
                     const transformedOrders = ordersArray.map(order => ({
                         id: order._id,
                         orderId: order._id,
@@ -246,8 +243,8 @@ function Myorders() {
                         status: order.status,
                         total_amount: parseFloat(order.total_amount || 0),
                         totalDiscountedPrice: parseFloat(order.total_amount || 0),
-                        delivery_otp: order.delivery_otp, // Preserve delivery_otp
-                        payment_details: order.payment_details, // Preserve payment_details
+                        delivery_otp: order.delivery_otp,
+                        payment_details: order.payment_details,
                         items: order.items ? order.items.map(item => ({
                             id: item._id,
                             product_id: item.product_id,
@@ -268,7 +265,6 @@ function Myorders() {
                         })) : []
                     }));
 
-                    // Only update state if orders have actually changed
                     setOrders(prevOrders => {
                         const hasChanged = JSON.stringify(prevOrders) !== JSON.stringify(transformedOrders);
                         if (hasChanged) {
@@ -283,12 +279,12 @@ function Myorders() {
             }
         };
 
-        const interval = setInterval(pollOrders, 30000); // Poll every 30 seconds (same as ecommerce)
+        const interval = setInterval(pollOrders, 30000);
 
         return () => clearInterval(interval);
     }, []);
 
-    // Buy Again handler (backend)
+    // Buy Again handler
     const handleBuyAgain = async (item) => {
         try {
             if (!item.product_id) {
@@ -297,14 +293,12 @@ function Myorders() {
             }
             const token = localStorage.getItem('token') || localStorage.getItem('demoToken') || 'demo-token';
 
-            // Fetch product details using product_id
             const productRes = await fetch(API_CONFIG.getUrl(`/api/groceries/${item.product_id}`), {
                 headers: { Authorization: `Bearer ${token}` }
             });
             if (!productRes.ok) throw new Error('Failed to fetch product details');
             const product = await productRes.json();
 
-            // Build the cart payload with real product info
             const cartPayload = {
                 grocery_id: item.product_id,
                 name: product.name,
@@ -348,7 +342,6 @@ function Myorders() {
             if (response.status === 401) throw { message: 'Unauthorized', status: 401 };
             if (!response.ok) throw new Error('Failed to update order status');
             
-            // Refresh orders to show updated status
             window.location.reload();
         } catch (err) {
             if (!handleAuthError(err)) {
@@ -369,191 +362,183 @@ function Myorders() {
                 ) : orders.length === 0 ? (
                     <div className="text-center py-8 text-gray-500">No orders placed yet.</div>
                 ) : (
-                    (() => {
-                        return orders.map(order => {
-                            return (
-                                <div key={order.orderId || order.id} className="bg-white border border-[#E1E1E1] rounded-[20px] mt-4 p-4">
-                                    <div className="flex justify-between items-start">
-                                        {/* Left Side: Order Info */}
-                                        <div>
-                                            <p className="text-sm text-gray-500">Order Placed:</p>
-                                            <p className="text-sm text-gray-800 font-medium mb-1">{order.date ? new Date(order.date).toLocaleDateString() : 'N/A'}</p>
-                                            <p className="text-sm text-gray-500">Order ID: <span className="font-mono">OD-{(order.orderId || order.id).slice(-6)}</span></p>
-                                            <p className="text-sm text-gray-500">Status: <span className="font-semibold text-blue-600">{order.status.charAt(0).toUpperCase() + order.status.slice(1).replace(/_/g, ' ')}</span>
-                                                <span className={`ml-2 inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                                                    order.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                                                    order.status === 'out_for_delivery' ? 'bg-orange-100 text-orange-800' :
-                                                    order.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
-                                                    order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                                                    'bg-blue-100 text-blue-800'
-                                                }`}>
-                                                    {order.status.replace(/_/g, ' ').toUpperCase()}
-                                                </span>
-                                            </p>
-                                            
-                                            {/* Driver Information Display */}
-                                            {order.driver_info && order.driver_info.driver_name && (
-                                                <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-sm font-medium text-blue-800">🚚 Driver:</span>
-                                                            <span className="text-sm font-semibold text-blue-900">
-                                                                {order.driver_info.driver_name}
-                                                            </span>
-                                                        </div>
-                                                        <div className="text-xs text-blue-700">
-                                                            {order.driver_info.driver_phone}
-                                                        </div>
-                                                    </div>
-                                                    <div className="text-xs text-blue-600 mt-1">
-                                                        {order.driver_info.vehicle_type} - {order.driver_info.vehicle_number}
-                                                    </div>
+                    orders.map(order => (
+                        <div key={order.orderId || order.id} className="bg-white border border-[#E1E1E1] rounded-[20px] mt-4 p-4">
+                            <div className="flex justify-between items-start">
+                                {/* Left Side: Order Info */}
+                                <div>
+                                    <p className="text-sm text-gray-500">Order Placed:</p>
+                                    <p className="text-sm text-gray-800 font-medium mb-1">{order.date ? new Date(order.date).toLocaleDateString() : 'N/A'}</p>
+                                    <p className="text-sm text-gray-500">Order ID: <span className="font-mono">OD-{(order.orderId || order.id).slice(-6)}</span></p>
+                                    <p className="text-sm text-gray-500">Status: <span className="font-semibold text-blue-600">{order.status.charAt(0).toUpperCase() + order.status.slice(1).replace(/_/g, ' ')}</span>
+                                        <span className={`ml-2 inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                                            order.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                                            order.status === 'out_for_delivery' ? 'bg-orange-100 text-orange-800' :
+                                            order.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
+                                            order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                            'bg-blue-100 text-blue-800'
+                                        }`}>
+                                            {order.status.replace(/_/g, ' ').toUpperCase()}
+                                        </span>
+                                    </p>
+                                    
+                                    {/* Driver Information Display */}
+                                    {order.driver_info && order.driver_info.driver_name && (
+                                        <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-medium text-blue-800">🚚 Driver:</span>
+                                                    <span className="text-sm font-semibold text-blue-900">
+                                                        {order.driver_info.driver_name}
+                                                    </span>
                                                 </div>
-                                            )}
+                                                <div className="text-xs text-blue-700">
+                                                    {order.driver_info.driver_phone}
+                                                </div>
+                                            </div>
+                                            <div className="text-xs text-blue-600 mt-1">
+                                                {order.driver_info.vehicle_type} - {order.driver_info.vehicle_number}
+                                            </div>
+                                        </div>
+                                    )}
 
-                                            {/* Delivery OTP Display */}
-                                            {hasOtp(order) && (
-                                                <div className="mt-2 p-3 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg shadow-sm">
-                                                    <div 
-                                                        className="flex items-center justify-between cursor-pointer hover:bg-yellow-100 rounded-md p-2 -m-2 transition-colors duration-200"
-                                                        onClick={() => toggleOtpVisibility(order.id)}
-                                                    >
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-sm font-medium text-yellow-800">🔐 Delivery OTP</span>
-                                                            <span className="text-xs text-yellow-600 bg-yellow-200 px-2 py-1 rounded-full">
-                                                                {revealedOtps.has(order.id) ? 'Hide' : 'Click to reveal'}
-                                                            </span>
+                                    {/* Delivery OTP Display */}
+                                    {hasOtp(order) && (
+                                        <div className="mt-2 p-3 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg shadow-sm">
+                                            <div 
+                                                className="flex items-center justify-between cursor-pointer hover:bg-yellow-100 rounded-md p-2 -m-2 transition-colors duration-200"
+                                                onClick={() => toggleOtpVisibility(order.id)}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-medium text-yellow-800">🔐 Delivery OTP</span>
+                                                    <span className="text-xs text-yellow-600 bg-yellow-200 px-2 py-1 rounded-full">
+                                                        {revealedOtps.has(order.id) ? 'Hide' : 'Click to reveal'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    {revealedOtps.has(order.id) ? (
+                                                        <div className="text-lg font-bold text-yellow-900 font-mono tracking-wider">
+                                                            {getOtpCode(order)}
                                                         </div>
-                                                        <div className="flex items-center gap-2">
-                                                            {revealedOtps.has(order.id) ? (
-                                                                <div className="text-lg font-bold text-yellow-900 font-mono tracking-wider">
-                                                                    {getOtpCode(order)}
-                                                                </div>
-                                                            ) : (
-                                                                <div className="text-lg font-bold text-yellow-600 font-mono tracking-wider">
-                                                                    ••••••
-                                                                </div>
-                                                            )}
-                                                            <div className="text-yellow-600">
-                                                                {revealedOtps.has(order.id) ? '👁️' : '👁️‍🗨️'}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    {revealedOtps.has(order.id) && (
-                                                        <div className="text-xs text-yellow-700 mt-2 pt-2 border-t border-yellow-200">
-                                                            Share this OTP with delivery person
+                                                    ) : (
+                                                        <div className="text-lg font-bold text-yellow-600 font-mono tracking-wider">
+                                                            ••••••
                                                         </div>
                                                     )}
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Right Side: Price and Actions */}
-                                        <div className="text-right">
-                                            {/* Fix: Removed +50 to match invoice amount */}
-                                            <p className="text-xl font-bold text-purple-600 mb-2">₹ {order.total_amount ? order.total_amount.toFixed(2) : 'N/A'}</p>
-                                            {/* Optional: If +50 is for shipping, display it separately like this:
-                                            <p className="text-xl font-bold text-purple-600 mb-2">₹ {order.total_amount ? order.total_amount.toFixed(2) : 'N/A'} + ₹50 Shipping</p>
-                                            <p className="text-sm text-gray-500">Total: ₹ {order.total_amount ? (order.total_amount + 50).toFixed(2) : 'N/A'}</p>
-                                            */}
-                                            <button onClick={() => setExpandedOrder(expandedOrder === order.orderId ? null : order.orderId)} className="text-sm font-medium text-purple-600 hover:underline">Invoice</button>
-                                            <br />
-                                            {/* <button onClick={() => setExpandedOrder(expandedOrder === order.orderId ? null : order.orderId)} className="text-sm font-medium text-gray-600 hover:underline mt-1">
-                                                {expandedOrder === order.orderId ? 'Hide Details' : 'View Details'}
-                                            </button> */}
-                                        </div>
-                                    </div>
-
-                                    {/* Collapsible Details Section */}
-                                    {expandedOrder === order.orderId && (
-                                        <div className="mt-4 pt-4 border-t border-gray-200">
-                                            <OrderStatusTimeline status={order.status} orderDate={order.date} />
-                                            
-                                            <h4 className='font-bold text-md mt-4 mb-2'>Items in this order:</h4>
-                                            {order.items && order.items.length === 0 && (
-                                                <div className="text-gray-500 text-sm mb-2">No items in this order.</div>
-                                            )}
-                                            {order.items && order.items.map(item => (
-                                                <div key={item.id} className="flex items-center justify-between mb-3 p-2 bg-gray-50 rounded-lg">
-                                                    <div className="flex items-center">
-                                                        <img src={item.image} alt={item.name} className="w-16 h-16 object-cover rounded-md mr-4"/>
-                                                        <div>
-                                                            <p className="font-semibold">{item.name}</p>
-                                                            <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
-                                                            <p className="text-sm text-gray-600">Price: ₹{item.price.toFixed(2)}</p>
-                                                        </div>
-                                                    </div>
-                                                    <button onClick={() => handleBuyAgain(item)} className="px-3 py-1.5 bg-purple-100 text-purple-700 text-xs font-semibold rounded-full hover:bg-purple-200 transition">
-                                                        Buy Again
-                                                    </button>
-                                                </div>
-                                            ))}
-                                            
-                                            {/* Driver Information in expanded view */}
-                                            {order.driver_info && order.driver_info.driver_name && (
-                                                <div className="mt-3 p-3 bg-blue-50 border-2 border-blue-200 rounded-lg">
-                                                    <div className="text-center">
-                                                        <div className="text-2xl mb-2">🚚</div>
-                                                        <div className="text-lg font-bold text-blue-800 mb-2">
-                                                            Your Delivery Driver
-                                                        </div>
-                                                        <div className="bg-white rounded-lg p-3 mb-2">
-                                                            <div className="text-lg font-semibold text-gray-800 mb-1">
-                                                                {order.driver_info.driver_name}
-                                                            </div>
-                                                            <div className="text-sm text-gray-600 mb-1">
-                                                                📞 {order.driver_info.driver_phone}
-                                                            </div>
-                                                            <div className="text-sm text-gray-600">
-                                                                🚗 {order.driver_info.vehicle_type} - {order.driver_info.vehicle_number}
-                                                            </div>
-                                                        </div>
-                                                        <div className="text-sm text-blue-700">
-                                                            Your driver will contact you when they're on the way
-                                                        </div>
+                                                    <div className="text-yellow-600">
+                                                        {revealedOtps.has(order.id) ? '👁️' : '👁️‍🗨️'}
                                                     </div>
                                                 </div>
-                                            )}
-
-                                            {/* Delivery OTP in expanded view */}
-                                            {hasOtp(order) && (
-                                                <div className="mt-3 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-200 rounded-lg shadow-sm">
-                                                    <div className="text-center">
-                                                        <div className="text-2xl mb-3">🔐</div>
-                                                        <div className="text-lg font-bold text-yellow-800 mb-3">
-                                                            Delivery OTP
-                                                        </div>
-                                                        <div 
-                                                            className="cursor-pointer hover:bg-yellow-100 rounded-lg p-3 transition-colors duration-200"
-                                                            onClick={() => toggleOtpVisibility(order.id)}
-                                                        >
-                                                            {revealedOtps.has(order.id) ? (
-                                                                <div className="text-3xl font-mono font-bold text-yellow-900 mb-2 tracking-widest">
-                                                                    {getOtpCode(order)}
-                                                                </div>
-                                                            ) : (
-                                                                <div className="text-3xl font-mono font-bold text-yellow-600 mb-2 tracking-widest">
-                                                                    ••••••
-                                                                </div>
-                                                            )}
-                                                            <div className="text-sm text-yellow-600 mb-2">
-                                                                {revealedOtps.has(order.id) ? '👁️ Tap to hide' : '👁️‍🗨️ Tap to reveal'}
-                                                            </div>
-                                                        </div>
-                                                        {revealedOtps.has(order.id) && (
-                                                            <div className="text-sm text-yellow-700 mt-2 pt-2 border-t border-yellow-200">
-                                                                Share this OTP with the delivery person
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                            </div>
+                                            {revealedOtps.has(order.id) && (
+                                                <div className="text-xs text-yellow-700 mt-2 pt-2 border-t border-yellow-200">
+                                                    Share this OTP with delivery person
                                                 </div>
                                             )}
                                         </div>
                                     )}
                                 </div>
-                            );
-                        });
-                    })()
+
+                                {/* Right Side: Price and Invoice Button */}
+                                <div className="text-right">
+                                    <p className="text-xl font-bold text-purple-600 mb-2">₹ {order.total_amount ? order.total_amount.toFixed(2) : 'N/A'}</p>
+                                    <button 
+                                        onClick={() => setExpandedOrder(expandedOrder === order.orderId ? null : order.orderId)} 
+                                        className="text-sm font-medium text-purple-600 hover:underline"
+                                    >
+                                        {expandedOrder === order.orderId ? 'Hide Details' : 'Invoice'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Collapsible Details Section */}
+                            {expandedOrder === order.orderId && (
+                                <div className="mt-4 pt-4 border-t border-gray-200">
+                                    <OrderStatusTimeline status={order.status} orderDate={order.date} />
+                                    
+                                    <h4 className='font-bold text-md mt-4 mb-2'>Items in this order:</h4>
+                                    {order.items && order.items.length === 0 && (
+                                        <div className="text-gray-500 text-sm mb-2">No items in this order.</div>
+                                    )}
+                                    {order.items && order.items.map(item => (
+                                        <div key={item.id} className="flex items-center justify-between mb-3 p-2 bg-gray-50 rounded-lg">
+                                            <div className="flex items-center">
+                                                <img src={item.image} alt={item.name} className="w-16 h-16 object-cover rounded-md mr-4"/>
+                                                <div>
+                                                    <p className="font-semibold">{item.name}</p>
+                                                    <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
+                                                    <p className="text-sm text-gray-600">Price: ₹{item.price.toFixed(2)}</p>
+                                                </div>
+                                            </div>
+                                            <button onClick={() => handleBuyAgain(item)} className="px-3 py-1.5 bg-purple-100 text-purple-700 text-xs font-semibold rounded-full hover:bg-purple-200 transition">
+                                                Buy Again
+                                            </button>
+                                        </div>
+                                    ))}
+                                    
+                                    {/* Driver Information in expanded view */}
+                                    {order.driver_info && order.driver_info.driver_name && (
+                                        <div className="mt-3 p-3 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                                            <div className="text-center">
+                                                <div className="text-2xl mb-2">🚚</div>
+                                                <div className="text-lg font-bold text-blue-800 mb-2">
+                                                    Your Delivery Driver
+                                                </div>
+                                                <div className="bg-white rounded-lg p-3 mb-2">
+                                                    <div className="text-lg font-semibold text-gray-800 mb-1">
+                                                        {order.driver_info.driver_name}
+                                                    </div>
+                                                    <div className="text-sm text-gray-600 mb-1">
+                                                        📞 {order.driver_info.driver_phone}
+                                                    </div>
+                                                    <div className="text-sm text-gray-600">
+                                                        🚗 {order.driver_info.vehicle_type} - {order.driver_info.vehicle_number}
+                                                    </div>
+                                                </div>
+                                                <div className="text-sm text-blue-700">
+                                                    Your driver will contact you when they're on the way
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Delivery OTP in expanded view */}
+                                    {hasOtp(order) && (
+                                        <div className="mt-3 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-200 rounded-lg shadow-sm">
+                                            <div className="text-center">
+                                                <div className="text-2xl mb-3">🔐</div>
+                                                <div className="text-lg font-bold text-yellow-800 mb-3">
+                                                    Delivery OTP
+                                                </div>
+                                                <div 
+                                                    className="cursor-pointer hover:bg-yellow-100 rounded-lg p-3 transition-colors duration-200"
+                                                    onClick={() => toggleOtpVisibility(order.id)}
+                                                >
+                                                    {revealedOtps.has(order.id) ? (
+                                                        <div className="text-3xl font-mono font-bold text-yellow-900 mb-2 tracking-widest">
+                                                            {getOtpCode(order)}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-3xl font-mono font-bold text-yellow-600 mb-2 tracking-widest">
+                                                            ••••••
+                                                        </div>
+                                                    )}
+                                                    <div className="text-sm text-yellow-600 mb-2">
+                                                        {revealedOtps.has(order.id) ? '👁️ Tap to hide' : '👁️‍🗨️ Tap to reveal'}
+                                                    </div>
+                                                </div>
+                                                {revealedOtps.has(order.id) && (
+                                                    <div className="text-sm text-yellow-700 mt-2 pt-2 border-t border-yellow-200">
+                                                        Share this OTP with the delivery person
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    ))
                 )}
             </div>
             <Footer />
